@@ -1,0 +1,3 @@
+<div class="icon-history" style="font-size: 2.5vmax;" onclick="javascript:location.reload();"><br/><div class="charms-text">Refresh</div></div><br/>
+<?php //echo $this->Html->link('<div class="icon-arrow-left-3 charms-text"><br/><div class="charms-text">Back</div></div>',array('controller'=>'pages','action'=>'display'),array('class'=>'fg-white','style'=>'font-size: 2.5vmax;')); ?>
+<div class="icon-arrow-left-3" style="font-size: 2.5vmax;" onclick="javascript:window.location='../../akadem/pages/'"><br/><div class="charms-text">Back</div></div><br/>
