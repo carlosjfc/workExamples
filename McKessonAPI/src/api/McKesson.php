@@ -149,7 +149,7 @@ class McKesson {
         }
         $connectionService = new ConnectionService($enpointMcKesson, null, null, $actionMcKesson, $XMLString);
         $response = $connectionService->request();
-        return $this->parseResponse($response, 'validateCard');
+        return $this->parseResponse($response, $service);
     }
 
 }
