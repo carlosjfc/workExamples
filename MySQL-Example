@@ -1,0 +1,53 @@
+DELIMITER $$
+CREATE DEFINER=`access_user`@`%` FUNCTION `DISTANCE_BETWEEN`(origen_lat DOUBLE(18,12), origen_lon DOUBLE(18,12), destination_lat DOUBLE(18,12), destination_lon DOUBLE(18,12)) RETURNS double(18,12)
+    DETERMINISTIC
+    COMMENT 'http://stackoverflow.com/questions/1006654/fastest-way-to-find-distance-between-two-lat-long-points\nTo return the value in a different format, replace the 6371000 in the function with the radius of Earth in your choice of unit. For example, kilometres would be 6367 and miles would be 3957\n'
+RETURN ACOS(
+	SIN(origen_lat * PI() / 180) * SIN(destination_lat * PI() / 180) + COS(origen_lat * PI() / 180) * COS(destination_lat * PI() / 180) * COS(destination_lon * PI() / 180 - origen_lon * PI() / 180)
+) * 3957$$
+DELIMITER ;
+
+
+DELIMITER $$
+CREATE DEFINER=`access_user`@`%` PROCEDURE `COMPANIES_AROUND`(IN professional_id INT, IN radio_search INT, IN records_by_services INT)
+    READS SQL DATA
+    DETERMINISTIC
+BEGIN
+DECLARE professional_lng DOUBLE(18,12); 
+DECLARE professional_lat DOUBLE(18,12);
+DECLARE area_lat_pt1 DOUBLE(18,12);
+DECLARE area_lng_pt1 DOUBLE(18,12);
+DECLARE area_lat_pt2 DOUBLE(18,12);
+DECLARE area_lng_pt2 DOUBLE(18,12);
+
+-- get the original lng and lat for the company_id 
+SELECT `professionals`.`lng`, `professionals`.`lat` INTO professional_lng, professional_lat FROM `professionals` WHERE `professionals`.`id` = professional_id LIMIT 1;
+
+-- calculate lng and lat for the rectangle:
+SET area_lng_pt1 = professional_lng-radio_search/ABS(COS(RADIANS(professional_lat))*69);
+SET area_lng_pt2 = professional_lng+radio_search/ABS(COS(RADIANS(professional_lat))*69);
+SET area_lat_pt1 = professional_lat-(radio_search/69); 
+SET area_lat_pt2 = professional_lat+(radio_search/69);
+
+-- run the query (Include in sometime filter the professionals for the one that the company requires, then the query will be even faster)
+SELECT tbl_results.* ,
+      @RandSeq := if( @lastCompany = tbl_results.service_id, @RandSeq +1, 1 ) as FinalSeq,
+      @lastCompany := tbl_results.service_id as carryForward
+FROM (
+SELECT register_companies.*, professional_services.service_id, DISTANCE_BETWEEN(professional_lat, professional_lng, `register_companies`.`lat`, `register_companies`.`lng`) AS distance
+FROM register_companies INNER JOIN company_required_resources ON register_companies.id = company_required_resources.company_id
+	 INNER JOIN professional_services ON company_required_resources.resource_id = professional_services.service_id
+	 INNER JOIN professionals ON professional_services.professional_id = professionals.id
+WHERE professionals.id = professional_id AND
+`professionals`.active = 1 AND
+(`register_companies`.`lng` BETWEEN area_lng_pt1 AND area_lng_pt2) AND (`register_companies`.`lat` BETWEEN area_lat_pt1 AND area_lat_pt2)
+HAVING
+distance <= radio_search) AS tbl_results
+HAVING
+      FinalSeq <= records_by_services
+ORDER BY
+      tbl_results.service_id,
+      RAND();
+
+END$$
+DELIMITER ;
